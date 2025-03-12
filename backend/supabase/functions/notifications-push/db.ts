@@ -67,18 +67,6 @@ export async function fetchRegisteredDevices(
   }
 
   console.log(`[Devices] Completed fetch. Total devices: ${devices.length}`);
-  return devices;
-}
 
-// Helper function to get only iOS devices with enabled notifications
-export async function fetchEnabledIosDevices() {
-  console.log("[Devices] Fetching enabled iOS devices...");
-
-  const devices = await fetchRegisteredDevices({
-    enabledOnly: true,
-    deviceType: "ios",
-  });
-
-  console.log(`[Devices] Found ${devices.length} enabled iOS devices`);
   return devices;
 }

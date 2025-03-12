@@ -2,7 +2,7 @@ import { connect } from "node:http2";
 
 import { NotificationPayload } from "./types.ts";
 import { BUNDLE_ID, getAuthTokenFromAPN } from "./apns.ts";
-import { fetchEnabledIosDevices } from "./db.ts";
+import { fetchRegisteredDevices } from "./db.ts";
 
 const APNS_DEVELOPMENT_URL = "api.sandbox.push.apple.com";
 const BATCH_SIZE = 100;
@@ -97,7 +97,7 @@ export async function sendNotification(payload: NotificationPayload) {
   };
 
   try {
-    const iosDevices = await fetchEnabledIosDevices();
+    const iosDevices = await fetchRegisteredDevices();
 
     if (iosDevices.length > 0) {
       const apnsToken = await getAuthTokenFromAPN();
