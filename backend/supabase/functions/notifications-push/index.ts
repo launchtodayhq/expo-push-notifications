@@ -2,19 +2,33 @@
 // https://deno.land/manual/getting_started/setup_your_environment
 // This enables autocomplete, go to definition, etc.
 
-console.log("Hello from Functions!")
+import { sendNotification } from "./notifications.ts";
 
-Deno.serve(async (req) => {
-  const { name } = await req.json()
-  const data = {
-    message: `Hello ${name}!`,
+console.log("Hello from Functions!");
+
+Deno.serve(async () => {
+  try {
+    const result = await sendNotification({
+      title: "Test Notification",
+      body: "Hello from the edge function! 👋",
+      data: {
+        screen: "settings",
+        testData: "Some extra data",
+      },
+    });
+
+    return new Response(JSON.stringify(result), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
   }
-
-  return new Response(
-    JSON.stringify(data),
-    { headers: { "Content-Type": "application/json" } },
-  )
-})
+});
 
 /* To invoke locally:
 

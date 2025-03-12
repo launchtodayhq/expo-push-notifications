@@ -9,36 +9,126 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useColorScheme } from "../hooks/useColorScheme";
+import { usePushNotifications } from "../hooks/usePushNotifications";
+
+import * as Notifications from "expo-notifications";
+import { supabase } from "@/services/supabase";
 
 export default function PushNotificationDemo() {
   const colorScheme = useColorScheme();
   const isDarkMode = colorScheme === "dark";
 
-  const [expoPushToken, setExpoPushToken] = useState<string>("");
+  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] =
     useState<boolean>(false);
+  const [isRegistered, setIsRegistered] = useState<boolean>(false);
 
-  // iOS native colors
-  const iosBlue = "#007AFF"; // Standard iOS blue
-  const iosDarkBlue = "#0A84FF"; // iOS blue for dark mode
+  const iosBlue = "#007AFF";
+  const iosDarkBlue = "#0A84FF";
+
+  const permission = usePushNotifications();
+
+  // Register device in database when we get permission and token
+  useEffect(() => {
+    const registerDeviceInDatabase = async () => {
+      if (permission === "granted" && expoPushToken && !isRegistered) {
+        try {
+          // Check if device is already registered
+          const { data: existingDevice, error: queryError } = await supabase
+            .from("registered_devices_table")
+            .select("*")
+            .eq("device_token", expoPushToken)
+            .single();
+
+          if (queryError && queryError.code !== "PGRST116") {
+            // PGRST116 is "no rows returned" error
+            console.error("Error checking device registration:", queryError);
+            return;
+          }
+
+          if (existingDevice) {
+            console.log("Device already registered:", existingDevice);
+            setNotificationsEnabled(existingDevice.enabled_notifications);
+            setIsRegistered(true);
+            return;
+          }
+
+          // Insert new device
+          const { data, error } = await supabase
+            .from("registered_devices_table")
+            .insert([
+              {
+                device_token: expoPushToken,
+                enabled_notifications: true,
+                device_type: Platform.OS,
+              },
+            ]);
+
+          if (error) {
+            console.error("Error registering device:", error);
+            return;
+          }
+
+          console.log("Device registered successfully:", data);
+          setNotificationsEnabled(true);
+          setIsRegistered(true);
+        } catch (error) {
+          console.error("Unexpected error registering device:", error);
+        }
+      }
+    };
+
+    registerDeviceInDatabase();
+  }, [permission, expoPushToken]);
 
   useEffect(() => {
-    // We'll implement the actual token registration later
-    setExpoPushToken("Loading token...");
+    async function getDevicePushToken(): Promise<string | null> {
+      if (Platform.OS === "ios") {
+        const { data: nativeToken } =
+          await Notifications.getDevicePushTokenAsync();
+
+        return nativeToken;
+      } else {
+        // For Android, we'll implement FCM later
+        console.log("[Push Notifications] Android not implemented yet");
+
+        return null;
+      }
+    }
+
+    getDevicePushToken().then((token) => {
+      setExpoPushToken(token);
+    });
   }, []);
 
-  const toggleNotifications = () => {
-    setNotificationsEnabled((previousState) => !previousState);
-    // We'll implement the actual enabling/disabling of notifications later
+  const toggleNotifications = async () => {
+    const newEnabledState = !notificationsEnabled;
+    setNotificationsEnabled(newEnabledState);
+
+    // Update the database if we have a token
+    if (expoPushToken) {
+      try {
+        const { error } = await supabase
+          .from("registered_devices_table")
+          .update({ enabled_notifications: newEnabledState })
+          .eq("device_token", expoPushToken);
+
+        if (error) {
+          console.error("Error updating notification status:", error);
+          // Revert UI state if update failed
+          setNotificationsEnabled(notificationsEnabled);
+        }
+      } catch (error) {
+        console.error("Unexpected error updating notification status:", error);
+        // Revert UI state if update failed
+        setNotificationsEnabled(notificationsEnabled);
+      }
+    }
   };
 
   return (
     <View style={[styles.container, isDarkMode && styles.darkContainer]}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Text style={[styles.title, isDarkMode && styles.darkText]}>
-          Push Notifications Demo
-        </Text>
-
         <View style={[styles.section, isDarkMode && styles.darkSection]}>
           <Text style={[styles.sectionTitle, isDarkMode && styles.darkText]}>
             Device Token
@@ -90,6 +180,7 @@ export default function PushNotificationDemo() {
               ios_backgroundColor={isDarkMode ? "#39393D" : "#E9E9EA"}
               onValueChange={toggleNotifications}
               value={notificationsEnabled}
+              disabled={permission !== "granted"}
             />
           </View>
         </View>
