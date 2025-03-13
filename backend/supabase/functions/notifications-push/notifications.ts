@@ -7,7 +7,7 @@ import { fetchRegisteredDevices } from "./db.ts";
 const APNS_DEVELOPMENT_URL = "api.sandbox.push.apple.com";
 const BATCH_SIZE = 100;
 
-async function sendIosNotification(
+async function  sendIosNotification(
   deviceToken: string,
   payload: NotificationPayload,
   authToken: string
